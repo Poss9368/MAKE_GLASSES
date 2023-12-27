@@ -2,7 +2,7 @@
 //  main.c
 //  vidrios_2D
 //
-//  Created by cjvillarroel on 5/6/19.
+//  Created by cjvillarroel 
 //  Copyright © 2019 cjvillarroel. All rights reserved.
 //
 
@@ -14,16 +14,16 @@
 #include <sys/stat.h>
 
 
-#define    N                            1024
+#define    N                            1024  // number of particles, perfect square required
 #define    DOUBLE_N                     ((double)N)
 #define    INV_N                        1/DOUBLE_N
 
 
 #define    UNI                          ((double)rand()/((double)RAND_MAX + 1.0))
 
-double   RHO;     //                       0.9
-double   L ;      //                       sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO))
-double   HALF_L;  //                       L/2
+double   RHO;     //                      0.9
+double   L ;      //                      sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO))
+double   HALF_L;  //                      L/2
 
 #define    M_PII                         3.14159265358979323846264338327
 
@@ -286,18 +286,16 @@ void calculateForces(){
                 if ( r2 < sigma2){
                     r=sqrt(r2);
                     sigma=sqrt(sigma2);
-                   
                     
                     if (potencial==0)
                     {
-                        //goo=C_e*(1-r/sigma)*(1/sigma);   // armonico
-                        goo=C_e*pow((1-r/sigma),1.5)*(1/sigma); // hertzian
+                        goo=C_e*(1-r/sigma)*(1/sigma);   // armonico
+                        //goo=C_e*pow((1-r/sigma),1.5)*(1/sigma); // hertzian
                     }
                     else
                     {
                         goo=C_e*(pow(sigma/r,3)-1);
                     }
-                    
                     
                     typicalForce += goo*goo;
                     
@@ -525,7 +523,7 @@ void impresor(){
     FILE *fp;
     char archi[150];
     
-    sprintf(archi,"result/vidrio2D_HERT_%d_%lf_%05d.dat",N,RHO,serial);
+    sprintf(archi,"result/vidrio2D_Harmonic_%d_%lf_%05d.dat",N,RHO,serial);
     fp = fopen(archi,"w");
     
     
@@ -569,9 +567,7 @@ int main(int argc, const char * argv[])
         evol_tem1();
         fire();    
         impresor();
-    }
-    
-    
+    }   
 }
 
 
