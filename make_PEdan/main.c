@@ -13,30 +13,37 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-#define    N                             1024*1
+#define    N                             1024
 #define    DOUBLE_N                      ((double)N)
 #define    INV_N                         1/DOUBLE_N
-
-
 #define    UNI                           ((double)rand()/((double)RAND_MAX + 1.0))
-//#define    RHO                          0.875
-//#define    L                            sqrt(((1.4*1.4+1)*M_PI*DOUBLE_N)/(2*RHO))
-//#define    HALF_L                       L/2
-
-double   RHO;     //                       0.9
-double   L ;      //                       sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO))
-double   HALF_L; //                       L/2
 
 #define    M_PII                            3.14159265358979323846264338327
-
-
 #define    MAX_CELLS                        (N)
-
-
 #define    MAX_NEBZ                         256
 #define    DR                               0.2
 #define    C_cutoff                         1.38541802488147397906623679177079
-#define    C_e                              1.0
+#define    C_cutoff2                        C_cutoff *C_cutoff
+
+
+#define    B0                      0.2
+#define    c_k                     10.0
+#define    C_e                     1.0  // constante de energia
+#define    C_1                     (c_k*(c_k+2)/8)*pow(B0/c_k,(c_k+4)/(c_k+2))  // constante de energia
+#define    C_2                     B0*(c_k+4)/4
+#define    C_3                     ((c_k+2)*(c_k+4)/8)*pow(B0/c_k,c_k/(c_k+2))
+
+
+const double Size_1[2][2] = {{1.0,1.2},{1.2,1.4}};
+const double Size_2[2][2] = {{1.0,1.2*1.2},{1.2*1.2,1.4*1.4}};
+const double Size_10[2][2] = {{1.0,1.2*1.2*1.2*1.2*1.2*1.2*1.2*1.2*1.2*1.2},{1.2*1.2*1.2*1.2*1.2*1.2*1.2*1.2*1.2*1.2,1.4*1.4*1.4*1.4*1.4*1.4*1.4*1.4*1.4*1.4}};
+const double Size_inv2[2][2] = {{1.0,1/(1.2*1.2)},{1/(1.2*1.2),1/(1.4*1.4)}};
+const double Size_inv4[2][2] = {{1.0,1/(1.2*1.2*1.2*1.2)},{1/(1.2*1.2*1.2*1.2),1/(1.4*1.4*1.4*1.4)}};
+
+
+double   RHO;      //                       0.9
+double   L ;       //                       sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO))
+double   HALF_L;   //                       L/2
 
 
 double rx[N], ry[N], fx[N], fy[N], px[N], py[N];
@@ -49,27 +56,19 @@ double listCutOffSqrd=(1.4*C_cutoff+DR)*(1.4*C_cutoff+DR);
 double cellCutOff=(1.4*C_cutoff+DR);
 
 
-double M[N*2*MAX_NEBZ][3];
-double B[2*N];
-
 int N_con_real;
 int numInCell[MAX_CELLS];
 int cells[MAX_CELLS][MAX_NEBZ];
 int nebListCounter;
 
-const double SizeSqrd[2][2] = {{C_cutoff*C_cutoff,1.2*C_cutoff*1.2*C_cutoff},{1.2*C_cutoff*1.2*C_cutoff,1.4*C_cutoff*1.4*C_cutoff}}; // [0][0] = small-small; [0][1] = [1][0] = large-small; [1][1] = large-large;
-const double Size_e[2][2] = {{1.00*C_cutoff,1.2*C_cutoff},{1.2*C_cutoff,1.4*C_cutoff}};
 
-double typicalForce,typicalGrad,force_neta,Vcontrol;
-int em=0;
+double typicalForce,typicalGrad,force_neta,Vcontrol,pressure;
 double kinetic,T;
 
 double max_D,tota_D=0;
+double fuerza_contactos; int potencial=0;
 
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Gradiente conjugado
-
 void impresor(void);
 void def_porte(void);
 void def_in_pos(void);
@@ -78,7 +77,6 @@ void updateNebzLists_malo(void);
 double desplaza1(double dt);
 double fireAdvanceTime(double Factor);
 void fixDrift(void);
-
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -111,6 +109,8 @@ void def_in_pos(void)
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 void updateNebzLists(void)
 {
+    
+    tota_D=0;
     int i,j,x,y,current,m,m2;
     int a,b,k,l,numHere,numThere,target,w;
     double dx,dy,r2,invCellSize;
@@ -205,63 +205,15 @@ void updateNebzLists(void)
     return;
 }
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-void updateNebzLists_malo(void)
-{
-    
-    
-    double dx,dy,r2;
-    for (int i=0; i<N; i++)
-        numOfNebz[i] = 0;
-    
-    
-    for (int i =0; i<N; i++)
-    {
-        for (int j =0; j<N; j++)
-        {
-            
-            if (i<j) {
-                dx = rx[j] - rx[i];
-                dy = ry[j] - ry[i];
-                // mess due to periodic boundary conditions
-                if ( dx >= HALF_L )
-                    dx -= L;
-                else if ( dx < -HALF_L )
-                    dx += L;
-                if ( dy >= HALF_L )
-                    dy -= L;
-                else if ( dy < -HALF_L )
-                    dy += L;
-                // end of mess
-                r2 = ( dx*dx + dy*dy);
-                if (r2 < listCutOffSqrd)
-                {
-                    nebz[i][numOfNebz[i]] = j;
-                    nebz[j][numOfNebz[j]] = i;
-                    numOfNebz[i]++;
-                    numOfNebz[j]++;
-                }
-                
-            }
-        }
-    }
-    
-    
-    
-    //actualiza++;
-    
-}
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-double fuerza_contactos; int potencial=0;
 void calculateForces(void)
 {
     int i,j,m,k;
-    double goo,dx,dy,r2,r,sigma;
-    double temp,sigma2;
+    double goo,dx,dy,r2,r,sigma,sigma10,inv_r,inv_r2;
+    double temp,temp2,sigma2,sigma_inv2, sigma_inv4,inv_r10;
     typicalForce=0;
-    
-    N_con_real=0;
     fuerza_contactos=0;
+    N_con_real=0;
+    pressure=0;
     
     for (i=0;i<N;i++){
         fx[i] = 0.0; fy[i] = 0.0;
@@ -287,67 +239,72 @@ void calculateForces(void)
                     dy += L;
                 // end of mess
                 r2 = ( dx*dx + dy*dy );
-                sigma2=SizeSqrd[size[i]][size[j]];
-                if ( r2 < sigma2){
-                    r=sqrt(r2);
-                    sigma=Size_e[size[i]][size[j]];
+                sigma2=Size_2[size[i]][size[j]];
+                if ( r2 < sigma2*C_cutoff2){
+                    r=sqrt(r2); inv_r=1/r;
+                    inv_r2=1/r2;
 
                     if (potencial==0)
                     {
-                        //goo=C_e*(1-r/sigma)*(1/sigma);   // armonico
-                        goo=C_e*pow((1-r/sigma),1.5)*(1/sigma); // hertzian
+                        sigma=Size_1[size[i]][size[j]];
+                        temp2=1/(sigma*C_cutoff);
+                        goo=C_e*(1-r*temp2)*temp2;   // armonico
+                        //goo=C_e*pow((1-r/(sigma*C_cutoff)),1.5)*(1/(sigma*C_cutoff)); // hertzian
                     }
                     else
                     {
-                        goo=C_e*(10*sigma2*sigma2*sigma2*sigma2*sigma2/(r2*r2*r2*r2*r2*r)+0.625201*r2*r/(sigma2*sigma2)-1.4*r/sigma2);
-                        
+                        sigma10=Size_10[size[i]][size[j]];
+                        sigma_inv2=Size_inv2[size[i]][size[j]];
+                        sigma_inv4=Size_inv4[size[i]][size[j]];
+                        inv_r10=inv_r2*inv_r2*inv_r2*inv_r2*inv_r2;
+                        goo=C_e*(10*sigma10*inv_r10*inv_r+4*C_1*r2*r*sigma_inv4-2*C_2*r*sigma_inv2);
                     }
                     
                     
-                    typicalForce += goo*goo;
-                    
-                    temp = dx*goo/r;
+                    temp = dx*goo*inv_r;
                     fx[j] += temp;
                     fx[i] -= temp;
-                    temp = dy*goo/r;
+                    temp = dy*goo*inv_r;
                     fy[j] += temp;
                     fy[i] -= temp;
                     
+                    pressure+=goo*r;
+                    typicalForce += goo*goo;
+                    fuerza_contactos+=goo; // REVISAR --  2 AGOSTO 2021
                     N_con_real++;
-                    fuerza_contactos+=goo*r;
-                    
                     
                 }
             }
         }
-        
-        
     }
-    
     
     typicalForce = sqrt(typicalForce/DOUBLE_N);
+    fuerza_contactos=fuerza_contactos/DOUBLE_N;
+    pressure=pressure/(L*L);
+    
     typicalGrad = 0.0;
     force_neta=0;
-    double temmm=0;
+    temp=0;
     for (i=0;i<N;i++)
     {
-        temmm=fx[i]*fx[i] + fy[i]*fy[i];
-        typicalGrad += temmm;
-        force_neta += sqrt(temmm);
-        
+        temp=fx[i]*fx[i] + fy[i]*fy[i];
+        typicalGrad += temp;
+        force_neta  += sqrt(temp);
     }
     typicalGrad = sqrt(typicalGrad/DOUBLE_N);
-    Vcontrol=typicalGrad/typicalForce;
     force_neta=force_neta/DOUBLE_N;
-    fuerza_contactos=fuerza_contactos/(L*L);
+
+    
+    Vcontrol=force_neta/fuerza_contactos;
     
 }
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-double desplaza1(double dt)
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+double desplaza1(double dt) // relajacion por desenso
 {
     double tem;
     max_D=0;
-   // double dt=0.9;
     for (int i=0; i<N; i++)
     {
         rx[i]=rx[i]+fx[i]*dt;
@@ -377,7 +334,7 @@ double desplaza1(double dt)
     return max_D;
 }
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-void evol_tem1(double dt,int step)
+void evol_tem1(double dt,int step) // relajacion por desenso
 {
     for (int i =0; i<step; i++)
     {
@@ -386,10 +343,9 @@ void evol_tem1(double dt,int step)
         if (tota_D>DR)
         {
             updateNebzLists();
-            tota_D=0;
         }
         calculateForces();
-        printf("\n %d:  contro %0.12lf force neta %0.12lf   %d ", i+1,Vcontrol,force_neta, N_con_real);
+        //printf("\n %d:  contro %0.12lf force neta %0.12lf   %d ", i+1,Vcontrol,force_neta, N_con_real);
     }
 }
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -403,9 +359,8 @@ void evol_tem1(double dt,int step)
 #define    F_DEC                        0.5
 #define    F_ALPHA                      0.99
 
-#define    MAX_ITERATIONS                       100000
-#define    RATIO_TOL                            1e-14
-
+#define    MAX_ITERATIONS                       250000
+#define    RATIO_TOL                            1e-12
 
 double timeStep,alpha;
 int numOfStepsSinceNegativePower,itr;
@@ -427,7 +382,6 @@ double fireAdvanceTime(double Factor)
         }
         else if (temp < 0.0){
             ry[i] = temp + L;
-            
         }
         else
             ry[i] = temp;
@@ -439,7 +393,6 @@ double fireAdvanceTime(double Factor)
         }
         else if (temp < 0.0){
             rx[i] = temp + L;
-            //  ghost_rx[i] += LENGTH;
         }
         else
             rx[i] = temp;
@@ -450,14 +403,15 @@ double fireAdvanceTime(double Factor)
     }
     max_D= sqrt(max_D);
     
-    
+    tota_D=tota_D+max_D;
+    if (tota_D>DR) updateNebzLists();
     calculateForces();
+    
     for (i=0; i<N; i++){
         px[i] += 0.5*timeStep*fx[i];
         py[i] += 0.5*timeStep*fy[i];
     }
-    
-    
+
     //calculate power
     power = 0.0;
     mod_force = 0.0;
@@ -506,19 +460,15 @@ int fire(double Factor)
     while ( itr < MAX_ITERATIONS && force_neta > RATIO_TOL )
     {
         max_D=fireAdvanceTime(Factor);
-        tota_D=tota_D+max_D;
-        if (tota_D>DR)
-        {
-            updateNebzLists();
-            tota_D=0;
-        }
-        
-         printf("\n %d:  contro %0.12lf force neta %0.12lf   %d ", itr+1,Vcontrol,force_neta, N_con_real);
-        itr++;
-        
+        //tota_D=tota_D+max_D;
+        //if (tota_D>DR) updateNebzLists();
+
+         //printf("\n %d:  contro %0.12lf force neta %0.12lf   %d ", itr+1,Vcontrol,force_neta, N_con_real);
+         itr++;
     }
+
     if ( itr == MAX_ITERATIONS ){
-        printf("\n        failed to minimize\n\n");
+        //printf("\n     failed to minimize\n\n");
         return 0;
     }
     else
@@ -526,11 +476,14 @@ int fire(double Factor)
         return 1;
     }
     
-}  // metodo de edan, el segundo en usarse.
+}
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#define    TIME_STEP_TER                     0.001
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#define    TIME_STEP_TER                     0.01
 #define    HALF_TIME_STEP_TER                0.5*TIME_STEP_TER
-void fixDrift(){
+void fixDrift()
+{
     int i;
     double Px,Py;
     Px = 0.0; Py = 0.0;
@@ -545,7 +498,9 @@ void fixDrift(){
     }
     return;
 }
-void advanceTime(double thermostat_timescale, double Factor){
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+void advanceTime(double thermostat_timescale, double Factor)
+{
     int i;
     double temp,dx,dy,inst_T=0,xi_T;
     max_D = 0;
@@ -583,7 +538,6 @@ void advanceTime(double thermostat_timescale, double Factor){
     if (tota_D>DR)
     {
         updateNebzLists();
-        tota_D=0;
     }
     
     calculateForces();
@@ -607,7 +561,7 @@ void advanceTime(double thermostat_timescale, double Factor){
                 }
     }
     /********************************************************************************/
-    printf("\n %lf %0.16lf %d", inst_T, force_neta,N_con_real);
+    //printf("\n %lf %0.16lf %0.16lf", inst_T, force_neta,fuerza_contactos);
     return;
 }
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -618,7 +572,7 @@ void termostado(double duration, double thermostat_timescale,double Factor)
     steps = (int)(duration/TIME_STEP);
     for (k=0; k<steps; k++){
             advanceTime(thermostat_timescale,Factor);
-            if ( !(k%32) )
+            if ( !(k%512) )
             {
                     fixDrift();
             }
@@ -627,20 +581,134 @@ void termostado(double duration, double thermostat_timescale,double Factor)
     
 }
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-void impresor()
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+double Xx[N],Xy[N],gx[N],gy[N],hx[N],hy[N],rx2[N],ry2[N];
+double timeStep_gra,gamma_Gra;
+void advaceTime_Grad(void)
+{
+    double temp,dx,dy;
+    max_D = 0;
+    for (int i=0; i<N; i++){
+        px[i] = timeStep_gra*Xx[i];
+        py[i] = timeStep_gra*Xy[i];
+        
+        dy = py[i]; //real space displacement
+        temp = ry[i]  + dy;
+        if (temp >= L){
+            ry[i] = temp - L;
+        }
+        else if (temp < 0.0){
+            ry[i] = temp + L;
+        }
+        else
+            ry[i] = temp;
+        
+        dx = px[i]; //real space displacement
+        temp = rx[i] + dx;
+        if (temp >= L){
+            rx[i] = temp - L;
+        }
+        else if (temp < 0.0){
+            rx[i] = temp + L;
+        }
+        else
+            rx[i] = temp;
+        
+        temp = dx*dx + dy*dy;
+        if (temp > max_D)
+            max_D = temp;
+    }
+    max_D= sqrt(max_D);
+    
+    tota_D=tota_D+max_D;
+    if (tota_D>DR) updateNebzLists();
+    calculateForces();
+    
+    
+}
+void grad_conj(void)
+{
+    double temp1,temp2, force_neta_ant;
+    timeStep_gra=0.05;
+    for (int i =0; i<N; i++)
+    {
+        Xx[i]=fx[i]; Xy[i]=fy[i];
+        gx[i]=fx[i]; gy[i]=fy[i];
+        hx[i]=fx[i]; hy[i]=fy[i];
+        rx2[i]=rx[i];
+        ry2[i]=ry[i];
+    }
+    
+    itr = 0;
+    while ( itr <1000 && force_neta > RATIO_TOL )
+    {
+        //printf("\n %d:  contro %0.12lf force neta %0.12lf   %d   %0.14lf", itr+1,Vcontrol,force_neta, N_con_real,timeStep_gra);
+        force_neta_ant=force_neta;
+
+        do
+        {
+            advaceTime_Grad();
+            if (force_neta>force_neta_ant)
+            {
+                for (int i =0; i<N; i++)
+                {
+                    rx[i]=rx2[i];
+                    ry[i]=ry2[i];
+                }
+                timeStep_gra*=0.5;
+            }
+            else
+            {
+                for (int i =0; i<N; i++)
+                {
+                    rx2[i]=rx[i];
+                    ry2[i]=ry[i];
+                }
+                timeStep_gra*=2;
+            }
+        } while (force_neta>force_neta_ant);
+        
+        
+        temp1=0; temp2=0;
+        for (int i =0; i<N; i++)
+        {
+            
+            temp1+=fx[i]*(fx[i])+fy[i]*fy[i];
+            temp2+=gx[i]*gx[i]+gy[i]*gy[i];
+            gx[i]=fx[i]; gy[i]=fy[i];
+        }
+        
+        gamma_Gra=temp1/temp2;
+        
+        for (int i =0; i<N; i++)
+        {
+            hx[i]=gx[i]+2*gamma_Gra*hx[i];
+            hy[i]=gy[i]+2*gamma_Gra*hy[i];
+            Xx[i]=hx[i];
+            Xy[i]=hy[i];
+
+        }
+        itr++;   
+    }   
+}
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+void impresor(void)
 {
     FILE *fp;
     char archi[150];
     
-    sprintf(archi,"result/vidrio2D_HERT_%d_%lf_%05d.dat",N,RHO,serial);
+    sprintf(archi,"result/vidrio2D_PEdan_%d_%lf_%05d.dat",N,RHO,serial);
     fp = fopen(archi,"w");
     
     
-    fprintf(fp,"%.18f\t%.18f\t%d\n",L,RHO,N);
+    fprintf(fp,"%.12f\t%.12f\t%.12f\n",L,RHO,pressure);
     
     for (int i = 0; i<N; i++)
     {
-        fprintf(fp,"%.18f\t%.18f\t%d\n",rx[i],ry[i],size[i]);
+        fprintf(fp,"%.14f\t%.14f\t%d\n",rx[i],ry[i],size[i]);
         
     }
     fclose(fp);
@@ -649,67 +717,36 @@ void impresor()
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 int main(int argc, const char * argv[])
 {
-     int ini; int fin;
-     //sscanf(argv[1],"%d",&ini);   //rho
-     //sscanf(argv[2],"%d",&fin);   //rho
-     //sscanf(argv[3],"%lf",&RHO);   //rho
-     //L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO));
-     //HALF_L=L/2;
+    int ini; int fin;
+    //sscanf(argv[1],"%d",&ini);   //rho
+    //sscanf(argv[2],"%d",&fin);   //rho
+    //sscanf(argv[3],"%lf",&RHO);   //rho
+    //L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO))*(C_cutoff*0.5);
+    //HALF_L=L/2;
     
     ini=0; fin=1;
     RHO=0.975;
-    //L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO));
-    L=sqrt(DOUBLE_N/RHO);
+    L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO))*(C_cutoff*0.5);
     HALF_L=L/2;
     
     for (int tt=ini; tt<fin+ini; tt++)
     {
-        potencial=0;  serial=tt;
-        srand( serial + 126 );
-        //double ll=L;  printf("%lf   %d    largo caja: %g    area: %lf\n",RHO,serial,ll,ll*ll);
+       potencial=0;  serial=tt;
+       srand( serial + 124 );
+       def_porte(); def_in_pos();
+       updateNebzLists(); calculateForces();
+       fire(1.0);
         
+       potencial=1; calculateForces();
+       T=1; termostado(100,1,1.0);
+       T=0.05; termostado(100,1,1.0);
+       fire(0.2);
         
-        def_porte();
-        def_in_pos();
-        updateNebzLists(); tota_D=0;
-        calculateForces();
-        //evol_tem1(0.9);
-        fire(1.0);
-        
-        for (int i=0;i<N;i++)
-        {
-            px[i] =0;
-            py[i] =0;
-        }
-        
-        potencial=1;
-        updateNebzLists();  tota_D=0;
-        calculateForces();
-        T=0; termostado(1000, 0.1,1);
-        evol_tem1(0.00001,1000);
-
-        
-        /*for (int i=0;i<N;i++)
-        {
-            px[i] =0;
-            py[i] =0;
-        }
-      
-        updateNebzLists();
-        calculateForces();
-        
-
-       //evol_tem1(0.000001);
-        for (int i=0;i<N;i++)
-        {
-            px[i] =0;
-            py[i] =0;
-        }
-        fire(0.0001);*/
-        
-        impresor();
+       impresor();
     }
 
 }
+
+
 
 
