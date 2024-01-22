@@ -724,7 +724,7 @@ int main(int argc, const char * argv[])
     //L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO))*(C_cutoff*0.5);
     //HALF_L=L/2;
     
-    ini=0; fin=1;
+    ini=0; fin=10;
     RHO=0.975;
     L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO))*(C_cutoff*0.5);
     HALF_L=L/2;
@@ -743,6 +743,7 @@ int main(int argc, const char * argv[])
        fire(0.2);
         
        impresor();
+       printf("\n fuerza final: %0.12lf", force_neta );
     }
 
 }
