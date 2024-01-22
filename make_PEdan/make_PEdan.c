@@ -704,7 +704,7 @@ void impresor(void)
     fp = fopen(archi,"w");
     
     
-    fprintf(fp,"%.12f\t%.12f\t%.12f\n",L,RHO,pressure);
+    fprintf(fp,"%.18f\t%.18f\t%d\n",L,RHO,N);
     
     for (int i = 0; i<N; i++)
     {
@@ -734,6 +734,8 @@ int main(int argc, const char * argv[])
        potencial=0;  serial=tt;
        srand( serial + 124 );
        def_porte(); def_in_pos();
+       double ll=L;  printf("\n %lf   %d    largo caja: %g    area: %lf\n",RHO,serial,ll,ll*ll);
+
        updateNebzLists(); calculateForces();
        fire(1.0);
         
@@ -743,7 +745,8 @@ int main(int argc, const char * argv[])
        fire(0.2);
         
        impresor();
-       printf("\n fuerza final: %0.12lf", force_neta );
+       printf(" fuerza final: %0.12lf \n", force_neta );
+       
     }
 
 }

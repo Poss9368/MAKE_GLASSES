@@ -558,7 +558,7 @@ int main(int argc, const char * argv[])
         tota_D=0;
         serial=tt;
         srand( serial + 123 );
-        double ll=L;  printf("%lf   %d    largo caja: %g    area: %lf\n",RHO,serial,ll,ll*ll);
+        double ll=L;  printf("\n %lf   %d    largo caja: %g    area: %lf\n",RHO,serial,ll,ll*ll);
         
         def_porte();
         def_in_pos();
@@ -567,6 +567,7 @@ int main(int argc, const char * argv[])
         evol_tem1();
         fire();    
         impresor();
+        printf(" fuerza final: %0.12lf \n", force_neta );
     }   
 }
 
