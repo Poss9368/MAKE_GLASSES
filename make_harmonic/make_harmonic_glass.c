@@ -523,7 +523,7 @@ void impresor(){
     FILE *fp;
     char archi[150];
     
-    sprintf(archi,"result/vidrio2D_Harmonic_%d_%lf_%05d.dat",N,RHO,serial);
+    sprintf(archi,"result/vidrio2D_Harmonic_%d_%0.5lf_%05d.dat",N,RHO,serial);
     fp = fopen(archi,"w");
     
     

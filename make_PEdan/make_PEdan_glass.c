@@ -13,7 +13,8 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-#define    N                             1024
+// use environment variable set N 
+#define    N                             512
 #define    DOUBLE_N                      ((double)N)
 #define    INV_N                         1/DOUBLE_N
 #define    UNI                           ((double)rand()/((double)RAND_MAX + 1.0))
@@ -700,7 +701,7 @@ void impresor(void)
     FILE *fp;
     char archi[150];
     
-    sprintf(archi,"result/vidrio2D_PEdan_%d_%lf_%05d.dat",N,RHO,serial);
+    sprintf(archi,"result/vidrio2D_PEdan_%d_%0.5lf_%05d.dat",N,RHO,serial);
     fp = fopen(archi,"w");
     
     
@@ -729,7 +730,7 @@ int main(int argc, const char * argv[])
     else
     {
         ini=0; fin=10;
-        RHO=0.925;
+        RHO=0.975;
         L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO))*(C_cutoff*0.5);
         HALF_L=L/2;
     }
