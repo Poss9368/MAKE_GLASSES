@@ -540,17 +540,22 @@ void impresor(){
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 int main(int argc, const char * argv[])
 {
-     unsigned int ini, fin;
-     //sscanf(argv[1],"%d",&ini);   //rho
-     //sscanf(argv[2],"%d",&fin);   //rho
-     //sscanf(argv[3],"%lf",&RHO);   //rho
-     //L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO));
-     //HALF_L=L/2;
-    
-    ini=0; fin=10;
-    RHO=0.925;
-    L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO));
-    HALF_L=L/2;
+    unsigned int ini, fin;
+    if (argc > 1)
+    {
+        sscanf(argv[1],"%d",&ini);   //rho
+        sscanf(argv[2],"%d",&fin);   //rho
+        sscanf(argv[3],"%lf",&RHO);   //rho
+        L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO));
+        HALF_L=L/2;
+    }
+    else
+    {
+        ini=0; fin=10;
+        RHO=0.925;
+        L =sqrt(((1.4*1.4+1)*M_PII*DOUBLE_N)/(2*RHO));
+        HALF_L=L/2;
+    }
     
     for (unsigned int tt=ini; tt<fin+ini; tt++)
     {
